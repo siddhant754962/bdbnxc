@@ -14,7 +14,9 @@ progress requires the backend to expose progress callbacks.
 import html
 import threading
 import time
+import uuid
 from datetime import datetime
+from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -307,8 +309,14 @@ with st.sidebar:
     )
 
     source = st.text_input(
-        "Video link or file path",
+        "YouTube video link (optional if uploading a file)",
         placeholder="https://youtube.com/watch?v=...",
+    )
+    uploaded_file = st.file_uploader(
+        "Or upload audio/video (avoids YouTube download blocks)",
+        type=["mp3", "wav", "m4a", "mp4", "webm", "mov", "mkv", "avi", "mpeg", "mpga", "aac", "ogg", "flac"],
+        accept_multiple_files=False,
+        help="Upload a media file from your computer. The app processes the uploaded file directly and does not need YouTube cookies.",
     )
     language = st.selectbox(
         "Spoken language",
@@ -328,6 +336,7 @@ with st.sidebar:
 
     st.markdown(
         '<p class="side-note">SiddAi VideoDost turns video speech into useful notes. '
+        'Paste a YouTube link or upload a media file directly. Direct upload avoids YouTube download authentication blocks. '
         'Keep this tab open while processing is underway.</p>',
         unsafe_allow_html=True,
     )
@@ -337,14 +346,37 @@ with st.sidebar:
 # ---------------------------------------------------------------------
 
 if process_clicked:
-    if not source.strip():
-        st.warning("Paste a YouTube link or a local file path to continue.")
+    selected_source = source.strip()
+    source_display_name = selected_source
+
+    # Uploaded files are saved inside the running app so the existing
+    # process_input -> transcription -> notes -> RAG pipeline can consume them.
+    # If both fields are filled, the uploaded file takes priority.
+    if uploaded_file is not None:
+        allowed_extensions = {
+            ".mp3", ".wav", ".m4a", ".mp4", ".webm", ".mov", ".mkv", ".avi",
+            ".mpeg", ".mpga", ".aac", ".ogg", ".flac",
+        }
+        suffix = Path(uploaded_file.name).suffix.lower()
+        if suffix not in allowed_extensions:
+            st.warning("Unsupported media format. Upload MP3, WAV, M4A, MP4, WebM, MOV, MKV, AVI, AAC, OGG, or FLAC.")
+            selected_source = ""
+        else:
+            upload_dir = Path(__file__).resolve().parent / "downloads"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            upload_path = upload_dir / f"upload_{uuid.uuid4().hex}{suffix}"
+            upload_path.write_bytes(uploaded_file.getvalue())
+            selected_source = str(upload_path)
+            source_display_name = uploaded_file.name
+
+    if not selected_source:
+        st.warning("Paste a YouTube link or upload an audio/video file to continue.")
     else:
         reset_video()
         outcome = {"done": False, "result": None, "error": None}
         worker = threading.Thread(
             target=run_pipeline_in_background,
-            args=(source.strip(), language, outcome),
+            args=(selected_source, language, outcome),
             daemon=True,
         )
 
@@ -386,12 +418,18 @@ if process_clicked:
 # ---------------------------------------------------------------------
 
 if st.session_state.processing_error:
+    error_text = st.session_state.processing_error
     st.error(
-        "SiddAi VideoDost couldn't process this video. Check the URL or file path, "
+        "SiddAi VideoDost couldn't process this input. Check the URL or media file, "
         "then try again."
     )
+    if "youtube blocked" in error_text.lower() or "sign in to confirm" in error_text.lower() or "not a bot" in error_text.lower():
+        st.info(
+            "YouTube has blocked automatic audio download from this server. "
+            "Use the audio/video upload control in the sidebar to continue without cookies."
+        )
     with st.expander("Technical details"):
-        st.code(st.session_state.processing_error)
+        st.code(error_text)
 
 # ---------------------------------------------------------------------
 # MAIN VIEW
@@ -416,7 +454,7 @@ if result is None:
     c1, c2, c3 = st.columns(3)
     c1.markdown(
         '<div class="step"><b>01 · Add a video</b>'
-        '<span>Paste a link or local file path in the sidebar to begin.</span></div>',
+        '<span>Paste a YouTube link or upload an audio/video file in the sidebar.</span></div>',
         unsafe_allow_html=True,
     )
     c2.markdown(
