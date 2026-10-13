@@ -2,6 +2,9 @@
 import re
 from urllib.parse import parse_qs, urlparse
 
+import re
+from urllib.parse import parse_qs, urlparse
+
 from dotenv import load_dotenv
 
 from utils.audio_processor import process_input

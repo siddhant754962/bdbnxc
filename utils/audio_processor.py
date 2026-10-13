@@ -22,6 +22,16 @@ except ImportError:
     # Local/system FFmpeg will continue to work if this optional package is absent.
     pass
 
+# Render may not have a system FFmpeg binary. imageio-ffmpeg ships a compatible
+# binary for common platforms; use it for MP3/M4A/MP4 and other media decoding.
+try:
+    import imageio_ffmpeg
+
+    AudioSegment.converter = imageio_ffmpeg.get_ffmpeg_exe()
+except ImportError:
+    # Local/system FFmpeg will continue to work if this optional package is absent.
+    pass
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DOWNLOAD_DIR = BASE_DIR / "downloads"
