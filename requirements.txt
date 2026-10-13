@@ -166,3 +166,4 @@ youtube-transcript-api<2
 yt-dlp==2026.8.19
 yt-dlp-ejs==0.8.0
 zstandard==0.25.0
+torchvision==0.29.1
