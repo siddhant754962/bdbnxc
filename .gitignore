@@ -9,4 +9,12 @@ __pycache__/
 vector_db/
 vector_db_real_test/
 downloads/
-"@ | Set-Content .gitignore
+"@ | Set-Content .gitignore.env
+cookies.txt
+.venv/
+venv/
+__pycache__/
+downloads/
+vector_db/
+*.pyc
+*.backup.py
